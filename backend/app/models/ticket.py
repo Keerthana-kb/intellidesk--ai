@@ -95,3 +95,5 @@ class Ticket(Base):
     creator: Mapped["User"] = relationship(foreign_keys=[created_by])
     assignee: Mapped["User | None"] = relationship(foreign_keys=[assigned_to])
     team: Mapped["Team | None"] = relationship()
+
+    

@@ -24,3 +24,18 @@ class TicketResponse(BaseModel):
 class TicketUpdate(BaseModel):
     status: Optional[str] = None
     priority: Optional[str] = None
+
+# =====================================
+# TICKET COMMENT SCHEMAS
+# =====================================
+
+class TicketCommentCreate(BaseModel):
+    comment: str = Field(min_length=1, max_length=5000)
+
+
+class TicketCommentResponse(BaseModel):
+    id: str
+    ticket_id: str
+    user_id: str
+    comment: str
+    created_at: datetime

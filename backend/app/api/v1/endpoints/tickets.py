@@ -1,11 +1,17 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-
+from app.models.ticket_comment import TicketComment
 from app.db.session import get_db
 from app.models.ticket import Ticket
 from app.models.user import User
-from app.schemas.ticket import TicketCreate, TicketResponse, TicketUpdate
+from app.schemas.ticket import (
+    TicketCreate,
+    TicketResponse,
+    TicketUpdate,
+    TicketCommentCreate,
+    TicketCommentResponse
+)
 from app.api.deps import get_current_user, require_roles
 
 router = APIRouter()
@@ -271,6 +277,98 @@ def delete_ticket(
         "message": "Ticket deleted successfully",
         "ticket_id": ticket_id
     }
+
+# =====================================
+# ADD TICKET COMMENT API
+# =====================================
+
+@router.post(
+    "/{ticket_id}/comments",
+    response_model=TicketCommentResponse,
+    status_code=status.HTTP_201_CREATED
+)
+def add_ticket_comment(
+    ticket_id: str,
+    comment_data: TicketCommentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Find ticket in the user's organization
+    ticket = db.query(Ticket).filter(
+        Ticket.id == ticket_id,
+        Ticket.organization_id == current_user.organization_id
+    ).first()
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found"
+        )
+
+    # Create a new comment
+    new_comment = TicketComment(
+        ticket_id=ticket.id,
+        user_id=current_user.id,
+        comment=comment_data.comment
+    )
+
+    db.add(new_comment)
+    db.commit()
+    db.refresh(new_comment)
+
+    return TicketCommentResponse(
+        id=str(new_comment.id),
+        ticket_id=str(new_comment.ticket_id),
+        user_id=str(new_comment.user_id),
+        comment=new_comment.comment,
+        created_at=new_comment.created_at
+    )
+
+
+# =====================================
+# VIEW TICKET COMMENTS API
+# =====================================
+
+@router.get(
+    "/{ticket_id}/comments",
+    response_model=list[TicketCommentResponse]
+)
+def get_ticket_comments(
+    ticket_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Check whether ticket exists in user's organization
+    ticket = db.query(Ticket).filter(
+        Ticket.id == ticket_id,
+        Ticket.organization_id == current_user.organization_id
+    ).first()
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found"
+        )
+
+    # Retrieve comments for this ticket
+    comments = db.query(TicketComment).filter(
+        TicketComment.ticket_id == ticket.id
+    ).order_by(
+        TicketComment.created_at.asc()
+    ).all()
+
+    return [
+        TicketCommentResponse(
+            id=str(comment.id),
+            ticket_id=str(comment.ticket_id),
+            user_id=str(comment.user_id),
+            comment=comment.comment,
+            created_at=comment.created_at
+        )
+        for comment in comments
+    ]
+
+
 
 
 
