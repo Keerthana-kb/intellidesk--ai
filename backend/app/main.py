@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from app.core.config import settings
 from app.db.session import engine
-from app.api.v1.endpoints import auth, tickets
+from app.api.v1.endpoints import auth, tickets, audit_logs
 
 
 # Initialize FastAPI application
@@ -28,6 +28,13 @@ app.include_router(
     tickets.router,
     prefix=f"{settings.API_V1_PREFIX}/tickets",
     tags=["Tickets"]
+)
+
+# Register Audit Logs APIs
+app.include_router(
+    audit_logs.router,
+    prefix=f"{settings.API_V1_PREFIX}/audit-logs",
+    tags=["Audit Logs"]
 )
 
 

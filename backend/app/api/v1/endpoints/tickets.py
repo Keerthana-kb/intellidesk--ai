@@ -5,7 +5,7 @@ from app.schemas.ticket import TicketAssign
 import uuid
 from app.models.ticket_event import TicketEvent
 from app.schemas.ticket import TicketEventResponse
-
+from app.services.audit_service import create_audit_log
 from app.db.session import get_db
 from app.models.ticket import Ticket
 from app.models.ticket_comment import TicketComment
@@ -27,6 +27,7 @@ router = APIRouter()
 # =====================================
 # CREATE TICKET API
 # =====================================
+
 
 
 @router.post(
@@ -62,6 +63,21 @@ def create_ticket(
 
     db.add(new_event)
 
+    # Create system-wide audit log
+    create_audit_log(
+        db=db,
+        organization_id=current_user.organization_id,
+        user_id=current_user.id,
+        action="ticket_created",
+        entity_type="ticket",
+        entity_id=new_ticket.id,
+        details={
+            "title": new_ticket.title,
+            "priority": new_ticket.priority,
+            "status": new_ticket.status
+        }
+    )
+
     db.commit()
     db.refresh(new_ticket)
 
@@ -74,6 +90,7 @@ def create_ticket(
         status=new_ticket.status,
         created_at=new_ticket.created_at
     )
+
 
 
 # =====================================
@@ -148,6 +165,7 @@ def get_all_tickets(
 # =====================================
 
 
+
 @router.patch(
     "/{ticket_id}/status",
     response_model=TicketResponse
@@ -190,14 +208,13 @@ def update_ticket_status(
             detail="Invalid ticket status"
         )
 
-    # Store previous status
     old_status = ticket.status
 
-    # Update status
     ticket.status = ticket_data.status
 
-    # Record event only if status actually changes
     if old_status != ticket_data.status:
+
+        # Ticket-specific event
         new_event = TicketEvent(
             ticket_id=ticket.id,
             user_id=current_user.id,
@@ -207,6 +224,20 @@ def update_ticket_status(
         )
 
         db.add(new_event)
+
+        # System-wide audit log
+        create_audit_log(
+            db=db,
+            organization_id=current_user.organization_id,
+            user_id=current_user.id,
+            action="ticket_status_updated",
+            entity_type="ticket",
+            entity_id=ticket.id,
+            details={
+                "old_status": old_status,
+                "new_status": ticket_data.status
+            }
+        )
 
     db.commit()
     db.refresh(ticket)
@@ -220,7 +251,6 @@ def update_ticket_status(
         status=ticket.status,
         created_at=ticket.created_at
     )
-
 
 # =====================================
 # UPDATE TICKET PRIORITY API
@@ -255,12 +285,7 @@ def update_ticket_priority(
             detail="Priority is required"
         )
 
-    allowed_priorities = [
-        "low",
-        "medium",
-        "high",
-        "critical"
-    ]
+    allowed_priorities = ["low", "medium", "high", "critical"]
 
     if ticket_data.priority not in allowed_priorities:
         raise HTTPException(
@@ -268,13 +293,10 @@ def update_ticket_priority(
             detail="Invalid ticket priority"
         )
 
-    # Store previous priority
     old_priority = ticket.priority
-
-    # Update priority
     ticket.priority = ticket_data.priority
 
-    # Record event only if priority changes
+    # Record both the ticket event and system-wide audit log only when changed.
     if old_priority != ticket_data.priority:
         new_event = TicketEvent(
             ticket_id=ticket.id,
@@ -283,8 +305,20 @@ def update_ticket_priority(
             old_value=old_priority,
             new_value=ticket_data.priority
         )
-
         db.add(new_event)
+
+        create_audit_log(
+            db=db,
+            organization_id=current_user.organization_id,
+            user_id=current_user.id,
+            action="ticket_priority_updated",
+            entity_type="ticket",
+            entity_id=ticket.id,
+            details={
+                "old_priority": old_priority,
+                "new_priority": ticket_data.priority
+            }
+        )
 
     db.commit()
     db.refresh(ticket)
@@ -298,7 +332,6 @@ def update_ticket_priority(
         status=ticket.status,
         created_at=ticket.created_at
     )
-
 
 # =====================================
 # DELETE TICKET API
@@ -436,48 +469,53 @@ def assign_ticket(
         require_roles("admin", "support_engineer")
     )
 ):
-    # Find the ticket
+    # Validate the ticket ID before using it in a database query.
+    try:
+        ticket_uuid = uuid.UUID(ticket_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid ticket ID"
+        )
+
     ticket = db.query(Ticket).filter(
-        Ticket.id == uuid.UUID(ticket_id),
+        Ticket.id == ticket_uuid,
         Ticket.organization_id == current_user.organization_id
     ).first()
 
     if not ticket:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Ticket not found"
         )
 
-    # Validate assigned user ID
+    # Validate the assigned support engineer ID.
     try:
         assigned_user_id = uuid.UUID(assignment.assigned_to)
     except ValueError:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid user ID"
         )
 
-    # Find support engineer in the same organization
+    # Only active support engineers in the same organization can be assigned.
     support_engineer = db.query(User).filter(
         User.id == assigned_user_id,
         User.organization_id == current_user.organization_id,
         User.role == "support_engineer",
-        User.is_active == True
+        User.is_active.is_(True)
     ).first()
 
     if not support_engineer:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Active support engineer not found"
         )
 
-    # Store previous assigned user
     old_assigned_to = ticket.assigned_to
-
-    # Assign ticket
     ticket.assigned_to = support_engineer.id
 
-    # Record assignment event only if assignment changes
+    # Record both the ticket event and system-wide audit log only when changed.
     if old_assigned_to != support_engineer.id:
         new_event = TicketEvent(
             ticket_id=ticket.id,
@@ -486,8 +524,23 @@ def assign_ticket(
             old_value=str(old_assigned_to) if old_assigned_to else None,
             new_value=str(support_engineer.id)
         )
-
         db.add(new_event)
+
+        create_audit_log(
+            db=db,
+            organization_id=current_user.organization_id,
+            user_id=current_user.id,
+            action="ticket_assigned",
+            entity_type="ticket",
+            entity_id=ticket.id,
+            details={
+                "old_assigned_to": (
+                    str(old_assigned_to) if old_assigned_to else None
+                ),
+                "new_assigned_to": str(support_engineer.id),
+                "assigned_user_name": support_engineer.full_name
+            }
+        )
 
     db.commit()
     db.refresh(ticket)
@@ -498,7 +551,6 @@ def assign_ticket(
         "assigned_to": str(support_engineer.id),
         "assigned_user_name": support_engineer.full_name
     }
-
 
 @router.get("/assigned-to-me", response_model=list[TicketResponse])
 def get_assigned_tickets(
