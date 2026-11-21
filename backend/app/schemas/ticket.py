@@ -33,9 +33,27 @@ class TicketCommentCreate(BaseModel):
     comment: str = Field(min_length=1, max_length=5000)
 
 
+
 class TicketCommentResponse(BaseModel):
     id: str
     ticket_id: str
     user_id: str
+    user_name: str
     comment: str
     created_at: datetime
+
+class TicketAssign(BaseModel):
+    assigned_to: str
+
+
+class TicketEventResponse(BaseModel):
+    id: str
+    ticket_id: str
+    user_id: Optional[str] = None
+    event_type: str
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    created_at: datetime
+    user_name: Optional[str] = None
+
+
