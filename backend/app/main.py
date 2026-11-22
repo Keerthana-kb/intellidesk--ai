@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from app.core.config import settings
 from app.db.session import engine
-from app.api.v1.endpoints import auth, tickets, audit_logs
+from app.api.v1.endpoints import auth, tickets, audit_logs, teams
 
 
 # Initialize FastAPI application
@@ -35,6 +35,12 @@ app.include_router(
     audit_logs.router,
     prefix=f"{settings.API_V1_PREFIX}/audit-logs",
     tags=["Audit Logs"]
+)
+
+app.include_router(
+    teams.router,
+    prefix=f"{settings.API_V1_PREFIX}/teams",
+    tags=["Team Management"]
 )
 
 
