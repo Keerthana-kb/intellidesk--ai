@@ -3,7 +3,11 @@ import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    UniqueConstraint
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -15,6 +19,14 @@ if TYPE_CHECKING:
 
 class TeamMember(Base):
     __tablename__ = "team_members"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "team_id",
+            "user_id",
+            name="uq_team_member_team_user"
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
