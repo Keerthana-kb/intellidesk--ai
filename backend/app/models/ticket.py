@@ -8,6 +8,7 @@ from sqlalchemy import (
     Text,
     DateTime,
     ForeignKey,
+    Boolean,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -88,6 +89,39 @@ class Ticket(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False
+    )
+        # SLA Management Fields
+
+    first_response_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    response_due_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    resolution_due_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    response_breached: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False
+    )
+
+    resolution_breached: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
         nullable=False
     )
 

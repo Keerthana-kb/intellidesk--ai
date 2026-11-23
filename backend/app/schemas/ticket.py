@@ -11,6 +11,7 @@ class TicketCreate(BaseModel):
     priority: str = "medium"
 
 
+
 class TicketResponse(BaseModel):
     id: str
     title: str
@@ -19,6 +20,16 @@ class TicketResponse(BaseModel):
     priority: str
     status: str
     created_at: datetime
+
+    # SLA tracking fields
+    first_response_at: Optional[datetime] = None
+    response_due_at: Optional[datetime] = None
+    resolved_at: Optional[datetime] = None
+    resolution_due_at: Optional[datetime] = None
+
+    response_breached: bool = False
+    resolution_breached: bool = False
+
 
 
 class TicketUpdate(BaseModel):

@@ -10,7 +10,8 @@ from app.db.session import get_db
 from app.models.ticket import Ticket
 from app.models.ticket_comment import TicketComment
 from app.models.user import User
-
+from app.services.sla_service import calculate_sla_deadlines
+from datetime import datetime, timezone
 from app.schemas.ticket import (
     TicketCreate,
     TicketResponse,
@@ -30,6 +31,7 @@ router = APIRouter()
 
 
 
+
 @router.post(
     "/",
     response_model=TicketResponse,
@@ -40,6 +42,24 @@ def create_ticket(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Get the current UTC time
+    created_at = datetime.now(timezone.utc)
+
+    # Calculate SLA deadlines based on ticket priority
+    sla_deadlines = calculate_sla_deadlines(
+        db=db,
+        organization_id=current_user.organization_id,
+        priority=ticket_data.priority,
+        created_at=created_at
+    )
+
+    if not sla_deadlines:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No active SLA policy found for priority: {ticket_data.priority}"
+        )
+
+    # Create ticket with SLA deadlines
     new_ticket = Ticket(
         organization_id=current_user.organization_id,
         created_by=current_user.id,
@@ -47,7 +67,10 @@ def create_ticket(
         description=ticket_data.description,
         category=ticket_data.category,
         priority=ticket_data.priority,
-        status="open"
+        status="open",
+        created_at=created_at,
+        response_due_at=sla_deadlines["response_due_at"],
+        resolution_due_at=sla_deadlines["resolution_due_at"]
     )
 
     db.add(new_ticket)
@@ -74,7 +97,9 @@ def create_ticket(
         details={
             "title": new_ticket.title,
             "priority": new_ticket.priority,
-            "status": new_ticket.status
+            "status": new_ticket.status,
+            "response_due_at": sla_deadlines["response_due_at"].isoformat(),
+            "resolution_due_at": sla_deadlines["resolution_due_at"].isoformat()
         }
     )
 
@@ -90,8 +115,6 @@ def create_ticket(
         status=new_ticket.status,
         created_at=new_ticket.created_at
     )
-
-
 
 # =====================================
 # VIEW MY TICKETS API
@@ -120,7 +143,14 @@ def get_my_tickets(
             category=ticket.category,
             priority=ticket.priority,
             status=ticket.status,
-            created_at=ticket.created_at
+            created_at=ticket.created_at,
+
+            first_response_at=ticket.first_response_at,
+            response_due_at=ticket.response_due_at,
+            resolved_at=ticket.resolved_at,
+            resolution_due_at=ticket.resolution_due_at,
+            response_breached=ticket.response_breached,
+            resolution_breached=ticket.resolution_breached
         )
         for ticket in tickets
     ]
@@ -154,7 +184,14 @@ def get_all_tickets(
             category=ticket.category,
             priority=ticket.priority,
             status=ticket.status,
-            created_at=ticket.created_at
+            created_at=ticket.created_at,
+
+            first_response_at=ticket.first_response_at,
+            response_due_at=ticket.response_due_at,
+            resolved_at=ticket.resolved_at,
+            resolution_due_at=ticket.resolution_due_at,
+            response_breached=ticket.response_breached,
+            resolution_breached=ticket.resolution_breached
         )
         for ticket in tickets
     ]
@@ -163,6 +200,7 @@ def get_all_tickets(
 # =====================================
 # UPDATE TICKET STATUS API
 # =====================================
+
 
 
 
@@ -209,12 +247,50 @@ def update_ticket_status(
         )
 
     old_status = ticket.status
-
     ticket.status = ticket_data.status
 
     if old_status != ticket_data.status:
 
-        # Ticket-specific event
+        # Record resolution timestamp only on first resolution
+        if (
+            ticket_data.status == "resolved"
+            and ticket.resolved_at is None
+        ):
+            resolved_at = datetime.now(timezone.utc)
+            ticket.resolved_at = resolved_at
+
+            # Check resolution SLA
+            if ticket.resolution_due_at:
+                ticket.resolution_breached = (
+                    resolved_at > ticket.resolution_due_at
+                )
+
+            # Record resolution SLA event
+            resolution_event = TicketEvent(
+                ticket_id=ticket.id,
+                user_id=current_user.id,
+                event_type="resolution_recorded",
+                old_value=None,
+                new_value=resolved_at.isoformat()
+            )
+
+            db.add(resolution_event)
+
+            # Create resolution audit log
+            create_audit_log(
+                db=db,
+                organization_id=current_user.organization_id,
+                user_id=current_user.id,
+                action="ticket_resolution_recorded",
+                entity_type="ticket",
+                entity_id=ticket.id,
+                details={
+                    "resolved_at": resolved_at.isoformat(),
+                    "resolution_breached": ticket.resolution_breached
+                }
+            )
+
+        # Ticket-specific status event
         new_event = TicketEvent(
             ticket_id=ticket.id,
             user_id=current_user.id,
@@ -225,7 +301,7 @@ def update_ticket_status(
 
         db.add(new_event)
 
-        # System-wide audit log
+        # System-wide status audit log
         create_audit_log(
             db=db,
             organization_id=current_user.organization_id,
@@ -249,12 +325,21 @@ def update_ticket_status(
         category=ticket.category,
         priority=ticket.priority,
         status=ticket.status,
-        created_at=ticket.created_at
+        created_at=ticket.created_at,
+
+        first_response_at=ticket.first_response_at,
+        response_due_at=ticket.response_due_at,
+        resolved_at=ticket.resolved_at,
+        resolution_due_at=ticket.resolution_due_at,
+        response_breached=ticket.response_breached,
+        resolution_breached=ticket.resolution_breached
     )
+
 
 # =====================================
 # UPDATE TICKET PRIORITY API
 # =====================================
+
 
 @router.patch(
     "/{ticket_id}/priority",
@@ -294,18 +379,51 @@ def update_ticket_priority(
         )
 
     old_priority = ticket.priority
-    ticket.priority = ticket_data.priority
+    new_priority = ticket_data.priority
 
-    # Record both the ticket event and system-wide audit log only when changed.
-    if old_priority != ticket_data.priority:
+    if old_priority != new_priority:
+
+        # Calculate deadlines using the original ticket creation time.
+        sla_deadlines = calculate_sla_deadlines(
+            db=db,
+            organization_id=ticket.organization_id,
+            priority=new_priority,
+            created_at=ticket.created_at
+        )
+
+        if not sla_deadlines:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No active SLA policy found for this priority"
+            )
+
+        ticket.priority = new_priority
+
+        ticket.response_due_at = sla_deadlines["response_due_at"]
+        ticket.resolution_due_at = sla_deadlines["resolution_due_at"]
+
+        # Record priority change.
         new_event = TicketEvent(
             ticket_id=ticket.id,
             user_id=current_user.id,
             event_type="priority_changed",
             old_value=old_priority,
-            new_value=ticket_data.priority
+            new_value=new_priority
         )
         db.add(new_event)
+
+        # Record SLA deadline recalculation.
+        sla_event = TicketEvent(
+            ticket_id=ticket.id,
+            user_id=current_user.id,
+            event_type="sla_deadlines_recalculated",
+            old_value=None,
+            new_value=(
+                f"Response: {ticket.response_due_at.isoformat()}, "
+                f"Resolution: {ticket.resolution_due_at.isoformat()}"
+            )
+        )
+        db.add(sla_event)
 
         create_audit_log(
             db=db,
@@ -316,7 +434,9 @@ def update_ticket_priority(
             entity_id=ticket.id,
             details={
                 "old_priority": old_priority,
-                "new_priority": ticket_data.priority
+                "new_priority": new_priority,
+                "response_due_at": ticket.response_due_at.isoformat(),
+                "resolution_due_at": ticket.resolution_due_at.isoformat()
             }
         )
 
@@ -330,8 +450,16 @@ def update_ticket_priority(
         category=ticket.category,
         priority=ticket.priority,
         status=ticket.status,
-        created_at=ticket.created_at
+        created_at=ticket.created_at,
+
+        first_response_at=ticket.first_response_at,
+        response_due_at=ticket.response_due_at,
+        resolved_at=ticket.resolved_at,
+        resolution_due_at=ticket.resolution_due_at,
+        response_breached=ticket.response_breached,
+        resolution_breached=ticket.resolution_breached
     )
+
 
 # =====================================
 # DELETE TICKET API
@@ -369,6 +497,7 @@ def delete_ticket(
 # ADD TICKET COMMENT API
 # =====================================
 
+
 @router.post(
     "/{ticket_id}/comments",
     response_model=TicketCommentResponse,
@@ -398,6 +527,46 @@ def add_ticket_comment(
     )
 
     db.add(new_comment)
+    db.flush()
+
+    # Track the first response from a support engineer
+    if (
+        current_user.role == "support_engineer"
+        and ticket.first_response_at is None
+    ):
+        ticket.first_response_at = new_comment.created_at
+
+        # Check whether the response met the SLA deadline
+        if ticket.response_due_at:
+            ticket.response_breached = (
+                ticket.first_response_at > ticket.response_due_at
+            )
+
+        # Record the SLA response event
+        response_event = TicketEvent(
+            ticket_id=ticket.id,
+            user_id=current_user.id,
+            event_type="first_response_recorded",
+            old_value=None,
+            new_value=ticket.first_response_at.isoformat()
+        )
+
+        db.add(response_event)
+
+        # Create audit log
+        create_audit_log(
+            db=db,
+            organization_id=current_user.organization_id,
+            user_id=current_user.id,
+            action="first_response_recorded",
+            entity_type="ticket",
+            entity_id=ticket.id,
+            details={
+                "response_breached": ticket.response_breached,
+                "first_response_at": ticket.first_response_at.isoformat()
+            }
+        )
+
     db.commit()
     db.refresh(new_comment)
 
@@ -572,7 +741,14 @@ def get_assigned_tickets(
             category=ticket.category,
             priority=ticket.priority,
             status=ticket.status,
-            created_at=ticket.created_at
+            created_at=ticket.created_at,
+
+            first_response_at=ticket.first_response_at,
+            response_due_at=ticket.response_due_at,
+            resolved_at=ticket.resolved_at,
+            resolution_due_at=ticket.resolution_due_at,
+            response_breached=ticket.response_breached,
+            resolution_breached=ticket.resolution_breached
         )
         for ticket in tickets
     ]

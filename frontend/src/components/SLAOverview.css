@@ -1,0 +1,84 @@
+
+.sla-overview {
+  margin-top: 28px;
+  background: #ffffff;
+  border: 1px solid #e6eaf0;
+  border-radius: 12px;
+  padding: 22px;
+}
+
+.sla-header {
+  margin-bottom: 22px;
+}
+
+.sla-header h2 {
+  color: #172033;
+  font-size: 19px;
+  margin-bottom: 7px;
+}
+
+.sla-header p {
+  color: #758096;
+  font-size: 13px;
+  margin: 0;
+}
+
+.sla-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.sla-card {
+  background: #f8faff;
+  border: 1px solid #edf0f5;
+  border-radius: 9px;
+  padding: 18px;
+  min-width: 0;
+}
+
+.sla-card span {
+  color: #758096;
+  font-size: 12px;
+}
+
+.sla-card h3 {
+  color: #2563eb;
+  font-size: 27px;
+  margin: 12px 0 7px;
+}
+
+.sla-card h3.breach-number {
+  color: #dc2626;
+}
+
+.sla-card p {
+  color: #8993a5;
+  font-size: 11px;
+  margin: 0;
+}
+
+.sla-total {
+  margin-top: 18px;
+  padding: 14px;
+  background: #fff5f5;
+  color: #8b3333;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.sla-total strong {
+  color: #dc2626;
+}
+
+@media (max-width: 1000px) {
+  .sla-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 550px) {
+  .sla-grid {
+    grid-template-columns: 1fr;
+  }
+}

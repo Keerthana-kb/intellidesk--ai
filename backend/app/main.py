@@ -5,13 +5,23 @@ from sqlalchemy import text
 from app.core.config import settings
 from app.db.session import engine
 from app.api.v1.endpoints import auth, tickets, audit_logs, teams
+from contextlib import asynccontextmanager
+from app.services.scheduler import start_scheduler, stop_scheduler
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    start_scheduler()
+    yield
+    stop_scheduler()
 
 
 # Initialize FastAPI application
 app = FastAPI(
     title=settings.APP_NAME,
     description="AI-Powered IT Service Desk",
-    version=settings.APP_VERSION
+    version=settings.APP_VERSION,
+    lifespan=lifespan
 )
 
 
