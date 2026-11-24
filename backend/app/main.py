@@ -1,10 +1,11 @@
 
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 from sqlalchemy import text
 
 from app.core.config import settings
 from app.db.session import engine
-from app.api.v1.endpoints import auth, tickets, audit_logs, teams
+from app.api.v1.endpoints import auth, tickets, audit_logs, teams, dashboard
 from contextlib import asynccontextmanager
 from app.services.scheduler import start_scheduler, stop_scheduler
 
@@ -23,6 +24,19 @@ app = FastAPI(
     version=settings.APP_VERSION,
     lifespan=lifespan
 )
+
+# Configure CORS for React frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 
 # Register Authentication APIs
@@ -47,6 +61,11 @@ app.include_router(
     tags=["Audit Logs"]
 )
 
+app.include_router(
+    dashboard.router,
+    prefix=f"{settings.API_V1_PREFIX}/dashboard",
+    tags=["Dashboard"]
+)
 app.include_router(
     teams.router,
     prefix=f"{settings.API_V1_PREFIX}/teams",
