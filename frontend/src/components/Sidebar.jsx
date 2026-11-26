@@ -1,7 +1,7 @@
 
 import './Sidebar.css'
 
-function Sidebar() {
+function Sidebar({ activePage, onNavigate }) {
   return (
     <aside className="sidebar">
 
@@ -16,17 +16,23 @@ function Sidebar() {
       <div className="sidebar-menu">
         <p className="menu-heading">WORKSPACE</p>
 
-        <a href="#" className="menu-item active">
+        <button
+          className={`menu-item ${activePage === 'dashboard' ? 'active' : ''}`}
+          onClick={() => onNavigate('dashboard')}
+        >
           <span>▦</span> Dashboard
-        </a>
+        </button>
 
         <a href="#" className="menu-item">
           <span>▤</span> All Tickets
         </a>
 
-        <a href="#" className="menu-item">
+        <button
+          className={`menu-item ${activePage === 'my-tickets' ? 'active' : ''}`}
+          onClick={() => onNavigate('my-tickets')}
+        >
           <span>◷</span> My Tickets
-        </a>
+        </button>
 
         <a href="#" className="menu-item">
           <span>♧</span> Teams

@@ -1,0 +1,140 @@
+
+.my-tickets-page {
+  background: #ffffff;
+  padding: 28px;
+  border-radius: 12px;
+  margin-top: 25px;
+  border: 1px solid #e5e7eb;
+}
+
+.my-tickets-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  gap: 15px;
+}
+
+.my-tickets-header h2 {
+  margin: 0 0 6px;
+  color: #172033;
+}
+
+.my-tickets-header p {
+  margin: 0;
+  color: #64748b;
+}
+
+.ticket-count {
+  background: #edf3ff;
+  color: #3978e8;
+  padding: 10px 16px;
+  border-radius: 7px;
+  font-weight: 600;
+}
+
+.my-tickets-table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.my-tickets-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.my-tickets-table th {
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 15px;
+  font-size: 13px;
+}
+
+.my-tickets-table td {
+  padding: 18px 15px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #334155;
+  font-size: 14px;
+}
+
+.priority-badge,
+.status-badge {
+  display: inline-block;
+  padding: 7px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.priority-badge.low {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.priority-badge.medium {
+  background: #fff7df;
+  color: #a16207;
+}
+
+.priority-badge.high {
+  background: #ffede3;
+  color: #c2410c;
+}
+
+.priority-badge.critical {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.status-badge.open {
+  background: #e5efff;
+  color: #2563eb;
+}
+
+.status-badge.in_progress {
+  background: #fff7df;
+  color: #a16207;
+}
+
+.status-badge.resolved,
+.status-badge.closed {
+  background: #e7f6e9;
+  color: #15803d;
+}
+
+.empty-tickets {
+  text-align: center;
+  padding: 45px 15px;
+  color: #64748b;
+}
+
+.empty-tickets h3 {
+  color: #172033;
+}
+
+.my-tickets-error {
+  color: #dc2626;
+}
+
+@media (max-width: 768px) {
+  .my-tickets-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+.clickable-ticket-row {
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.clickable-ticket-row:hover {
+  background: #f1f5f9;
+}
+
+.clickable-ticket-row:focus-visible {
+  outline: 2px solid #3978e8;
+  outline-offset: -2px;
+}

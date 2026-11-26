@@ -808,3 +808,57 @@ def get_ticket_events(
     ]
 
 
+# =====================================
+# GET SINGLE TICKET BY ID API
+# =====================================
+
+@router.get(
+    "/{ticket_id}",
+    response_model=TicketResponse
+)
+def get_ticket_by_id(
+    ticket_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Validate ticket UUID
+    try:
+        ticket_uuid = uuid.UUID(ticket_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid ticket ID"
+        )
+
+    # Retrieve ticket within the user's organization
+    ticket = db.query(Ticket).filter(
+        Ticket.id == ticket_uuid,
+        Ticket.organization_id == current_user.organization_id
+    ).first()
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found"
+        )
+
+    return TicketResponse(
+        id=str(ticket.id),
+        title=ticket.title,
+        description=ticket.description,
+        category=ticket.category,
+        priority=ticket.priority,
+        status=ticket.status,
+        created_at=ticket.created_at,
+
+        first_response_at=ticket.first_response_at,
+        response_due_at=ticket.response_due_at,
+        resolved_at=ticket.resolved_at,
+        resolution_due_at=ticket.resolution_due_at,
+
+        response_breached=ticket.response_breached,
+        resolution_breached=ticket.resolution_breached
+    )
+
+
+

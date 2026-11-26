@@ -1,0 +1,94 @@
+
+.create-ticket-page {
+  background: #ffffff;
+  padding: 28px;
+  border-radius: 12px;
+  margin-top: 25px;
+  border: 1px solid #e5e7eb;
+}
+
+.create-ticket-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+}
+
+.create-ticket-header h2 {
+  margin: 0 0 6px;
+  color: #172033;
+}
+
+.create-ticket-header p {
+  color: #64748b;
+  margin: 0;
+}
+
+.create-ticket-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 650px;
+}
+
+.create-ticket-form label {
+  font-weight: 600;
+  color: #334155;
+  margin-top: 8px;
+}
+
+.create-ticket-form input,
+.create-ticket-form textarea,
+.create-ticket-form select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.create-ticket-form textarea {
+  resize: vertical;
+}
+
+.create-ticket-form input:focus,
+.create-ticket-form textarea:focus,
+.create-ticket-form select:focus {
+  outline: none;
+  border-color: #3978e8;
+}
+
+.submit-ticket-button {
+  background: #3978e8;
+  color: white;
+  border: none;
+  padding: 13px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-weight: 600;
+  margin-top: 15px;
+}
+
+.submit-ticket-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cancel-button {
+  padding: 9px 16px;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.ticket-error {
+  color: #dc2626;
+  font-size: 14px;
+}
+
+.ticket-success {
+  color: #16a34a;
+  font-size: 14px;
+}
